@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #1a1a2e;
+            color: #e2e2e2;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1000px;
+            margin: 50px auto;
+            text-align: center;
+        }
+
+        .text-display {
+            font-size: 1.5rem;
+            margin-bottom: 30px;
+            background: #16213e;
+            padding: 20px;
+            border-radius: 15px;
+            line-height: 1.5;
+            text-align: left;
+            height: 150px;
+            overflow: hidden;
+        }
+
+        .text-display span {
+            position: relative;
+        }
+
+        .text-display span.correct {
+            color: #4ecca3;
+        }
+
+        .text-display span.incorrect {
+            color: #e94560;
+            text-decoration: underline;
+        }
+
+        .text-display span.current {
+            background-color: #0f3460;
+        }
+
+        .input-area {
+            position: relative;
+            margin: 20px 0;
+        }
+
+        #typing-input {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.2rem;
+            background: #16213e;
+            border: none;
+            border-radius: 8px;
+            color: #e2e2e2;
+            caret-color: #4ecca3;
+        }
+
+        #typing-input:focus {
+            outline: 2px solid #4ecca3;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 20px 0;
+        }
+
+        .stat-box {
+            background: #16213e;
+            padding: 15px 25px;
+            border-radius: 8px;
+            min-width: 100px;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #8d8d8d;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #4ecca3;
+        }
+
+        button {
+            background: #4ecca3;
+            color: #1a1a2e;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+        }
+
+        .title {
+            font-size: 2.5rem;
+            color: #4ecca3;
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">FlowType</h1>
+        <div class="text-display" id="text-display"></div>
+        <div class="input-area">
+            <input type="text" id="typing-input" placeholder="Start typing to begin..." autocomplete="off">
+        </div>
+        <div class="stats">
+            <div class="stat-box">
+                <div class="stat-label">WPM</div>
+                <div class="stat-value" id="wpm">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Accuracy</div>
+                <div class="stat-value" id="accuracy">0%</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Time</div>
+                <div class="stat-value" id="time">60s</div>
+            </div>
+        </div>
+        <button id="reset-button">Reset Test</button>
+    </div>
+
+    <script>
+        const textDisplay = document.getElementById('text-display');
+        const typingInput = document.getElementById('typing-input');
+        const wpmDisplay = document.getElementById('wpm');
+        const accuracyDisplay = document.getElementById('accuracy');
+        const timeDisplay = document.getElementById('time');
+        const resetButton = document.getElementById('reset-button');
+
+        const sampleTexts = [
+            "The quick brown fox jumps over the lazy dog while the nimble cat watches from afar with curious eyes.",
+            "Programming is the art of telling another human what one wants the computer to do through carefully crafted code.",
+            "In the midst of chaos, there is also opportunity for those who can maintain their composure and think clearly.",
+            "Technology continues to advance at an unprecedented rate, transforming the way we live, work, and interact.",
+            "The best way out is always through, and the best way to get started is to quit talking and begin doing.",
+            "The way to get started is to quit talking and begin doing, and the best way out is always through.",
+            "The pessimist sees difficulty in every opportunity, the optimist sees opportunity in every difficulty.",
+            "The greatest glory in living lies not in never falling, but in rising every time we fall.",
+            "If you want to make a good first impression, start with a good last impression.",
+            "The best way to predict your future is to create it, and the best way to create it is to start by taking the first step.",
+            "The most important thing in communication is hearing what isn't said, and the most important thing in communication is hearing what isn't said."
+        ];
+
+        let currentText = '';
+        let currentIndex = 0;
+        let startTime = null;
+        let timer = null;
+        let timeRemaining = 60;
+        let correctChars = 0;
+        let totalChars = 0;
+        let characterStates = [];
+
+        function initializeTest() {
+            currentText = sampleTexts[Math.floor(Math.random() * sampleTexts.length)];
+            currentIndex = 0;
+            startTime = null;
+            timeRemaining = 60;
+            correctChars = 0;
+            totalChars = 0;
+            characterStates = new Array(currentText.length).fill(null);
+            
+            displayText();
+            typingInput.value = '';
+            typingInput.disabled = false;
+            timeDisplay.textContent = '60s';
+            wpmDisplay.textContent = '0';
+            accuracyDisplay.textContent = '0%';
+        }
+
+        function displayText() {
+            textDisplay.innerHTML = currentText.split('').map((char, index) => {
+                let className = '';
+                if (characterStates[index] !== null) {
+                    className = characterStates[index] ? 'correct' : 'incorrect';
+                }
+                if (index === currentIndex) {
+                    className += ' current';
+                }
+                return `<span class="${className}">${char}</span>`;
+            }).join('');
+        }
+
+        function calculateWPM() {
+            const timeElapsed = (60 - timeRemaining) / 60;
+            const words = correctChars / 5;
+            return Math.round(words / timeElapsed);
+        }
+
+        function calculateAccuracy() {
+            return totalChars > 0 ? Math.round((correctChars / totalChars) * 100) : 0;
+        }
+
+        function startTimer() {
+            timer = setInterval(() => {
+                timeRemaining--;
+                timeDisplay.textContent = `${timeRemaining}s`;
+                
+                if (timeRemaining <= 0) {
+                    endTest();
+                }
+            }, 1000);
+        }
+
+        function endTest() {
+            clearInterval(timer);
+            typingInput.disabled = true;
+            wpmDisplay.textContent = calculateWPM();
+            accuracyDisplay.textContent = `${calculateAccuracy()}%`;
+        }
+
+        typingInput.addEventListener('input', (e) => {
+            if (!startTime && e.inputType !== 'deleteContentBackward') {
+                startTime = new Date();
+                startTimer();
+            }
+
+            if (e.inputType === 'deleteContentBackward' && currentIndex > 0) {
+                currentIndex--;
+                if (characterStates[currentIndex] !== null) {
+                    if (characterStates[currentIndex]) correctChars--;
+                    totalChars--;
+                }
+                characterStates[currentIndex] = null;
+            } else if (e.inputType !== 'deleteContentBackward') {
+                const inputChar = typingInput.value[typingInput.value.length - 1];
+                const correctChar = currentText[currentIndex];
+
+                const isCorrect = inputChar === correctChar;
+                characterStates[currentIndex] = isCorrect;
+
+                if (isCorrect) {
+                    correctChars++;
+                }
+                totalChars++;
+                currentIndex++;
+            }
+
+            if (currentIndex >= currentText.length) {
+                endTest();
+            }
+
+            displayText();
+            if (startTime) {
+                wpmDisplay.textContent = calculateWPM();
+                accuracyDisplay.textContent = `${calculateAccuracy()}%`;
+            }
+        });
+
+        resetButton.addEventListener('click', () => {
+            clearInterval(timer);
+            initializeTest();
+        });
+
+        initializeTest();
+    </script>
+</body>
+</html>
